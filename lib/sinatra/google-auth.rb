@@ -1,4 +1,4 @@
-require 'omniauth-google-apps'
+require 'omniauth-google-oauth2'
 require 'openid/store/filesystem'
 require 'securerandom'
 
@@ -11,11 +11,11 @@ module Sinatra
       end
 
       def call(env)
-        if env['rack.session']["user"] || env['REQUEST_PATH'] =~ /\/auth\/google_apps/
+        if env['rack.session']["user"] || env['REQUEST_PATH'] =~ /\/auth\/google_oauth2/
           @app.call(env)
         else
           env['rack.session']['google-auth-redirect'] = env['REQUEST_PATH']
-          location = File.join(env['REQUEST_PATH'], '/auth/google_apps')
+          location = File.join(env['REQUEST_PATH'], '/auth/google_oauth2')
           return [301, {'Content-Type' => 'text/html', 'Location' => location}, []]
         end
       end
@@ -26,9 +26,9 @@ module Sinatra
         unless session["user"]
           session['google-auth-redirect'] = request.path
           if settings.absolute_redirect?
-            redirect "/auth/google_apps"
+            redirect "/auth/google_oauth2"
           else
-            redirect to "/auth/google_apps"
+            redirect to "/auth/google_oauth2"
           end
         end
       end
@@ -53,7 +53,9 @@ module Sinatra
       raise "Must supply ENV var GOOGLE_AUTH_DOMAIN" unless ENV['GOOGLE_AUTH_DOMAIN']
       app.helpers GoogleAuth::Helpers
       app.use ::Rack::Session::Cookie, :secret => secret
-      app.use OmniAuth::Strategies::GoogleApps, :domain => ENV['GOOGLE_AUTH_DOMAIN'], :store => nil
+      app.use OmniAuth::Builder do
+        provider :google_oauth2, ENV['GOOGLE_CLIENT_ID'], ENV['GOOGLE_CLIENT_SECRET'], {:hd => ENV['GOOGLE_AUTH_DOMAIN']}
+      end
 
       app.set :absolute_redirect, false
 
